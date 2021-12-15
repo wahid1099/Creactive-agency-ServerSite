@@ -34,6 +34,14 @@ async function run(){
              const cursor=servicecollection.find({});
              const allservices = await cursor.toArray();
              res.json(allservices);
+         });
+         app.get('/services/:id',async (req,res) => {
+             const id=req.params.id;
+             const query={_id:ObjectId(id)};
+            
+            const singleservice=await servicecollection.findOne(query);
+            res.json(singleservice);
+
          })
     }
     finally{
