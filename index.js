@@ -30,6 +30,8 @@ async function run(){
          const database=client.db('CreativeAgency');
          const servicecollection = database.collection('Services');
          const userCollection=database.collection('Users');
+         const orderCollection=database.collection('Orders');
+         const reviewCollection=database.collection('Reviews');
 
 
          //getting all services api calls
@@ -68,6 +70,34 @@ async function run(){
 
 
          });
+         //user review adding to databset
+         app.post('/addReview',async (req,res)=>{
+            const userReview=req.body;
+            const Reviewresult=await reviewCollection.insertOne(userReview);
+           // console.log(carresult);
+            res.json(Reviewresult);
+        });
+        //order service collection
+        app.post('/purchaseService',async (req,res)=>{
+            const orderservice=req.body;
+            const orderresult=await orderCollection.insertOne(orderservice);
+           // console.log(carresult);
+            res.json(orderresult);
+        });
+        app.get('/userorders',async(req,res) => {
+            const email=req.query.email;
+            const query={useremail:email};
+            const cursor=orderCollection.find(query);
+            const userordered=await cursor.toArray();
+            res.json(userordered);
+        });
+        //allusers oders for admin users
+        app.get('/allorders',async (req, res) => {
+            const cursor=orderCollection.find({});
+            const orders=await cursor.toArray();
+            res.send(orders);
+
+        })
 
          //checking admin from database
          app.get('/users/:email',async (req,res) => {
