@@ -5,6 +5,8 @@ require('dotenv').config();
 const ObjectId=require('mongodb').ObjectId;
 const{MongoClient}=require('mongodb');
 const fileUpload=require('express-fileupload');
+ const admin = require("firebase-admin");
+
 
 
 //defualt port
@@ -13,11 +15,35 @@ const port=process.env.PORT|| 7000;
 app.use(cors());
 app.use(express.json());
 app.use(fileUpload());
+//firebase admin connection
+// const serviceAccount = require("path/to/serviceAccountKey.json");
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
 
 //connection string in mongo
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.byzxg.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`
 //connecting database
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+
+//////---------------------------//////////////////////
+async function verifyToken(req,res, next){
+    if(req.headers?.authorization?.startsWith('Bearer ')){
+        const token=req.headers.authorization.split(' ')[1];
+        try{
+            const decodedUser=await admin.auth().verifyIdToken(token);
+            req.decodedEmail=decodedUser.email;
+        }
+        catch{
+
+        }
+    }
+    next();
+}
+
+////////////--------------------///////////////////////////////////////////
 
 
 async function run(){
@@ -53,15 +79,17 @@ async function run(){
          app.post('/addservice',async (req, res) => {
              const name=req.body.name;
              const price=req.body.price;
+             const img=req.body.img;
              const description=req.body.description;
-             const pic=req.body.img;
-             const picData=pic.data;
-             const encodedpic=picData.toString('base64');
-             const imageBuffer=Buffer.from(encodedpic,'base64');
+
+            //  const pic=req.body.img;
+            //  const picData=pic.data;
+            //  const encodedpic=picData.toString('base64');
+            //  const imageBuffer=Buffer.from(encodedpic,'base64');
              const service={
                  name,
                  description,
-                 img:imageBuffer,
+                     img,
                  price
              }
              const result=await servicecollection.insertOne(service);
@@ -98,7 +126,24 @@ async function run(){
             res.send(orders);
 
         })
+        //deleting order api for admin site 
+             app.delete('/deleteorder/:id',async(req,res) => {
+                 const id=req.params.id;
+                 const query={_id:ObjectId(id)};
+                 const result=await orderCollection.deleteOne(query);
+                 res.json(result);
 
+
+             })
+             //deleting service api
+             app.delete('/deleteService/:id',async(req,res) => {
+                const id=req.params.id;
+                const query={_id:ObjectId(id)};
+                const result=await servicecollection.deleteOne(query);
+                res.json(result);
+                
+
+            })
          //checking admin from database
          app.get('/users/:email',async (req,res) => {
              const email = req.params.email;
@@ -124,7 +169,31 @@ async function run(){
              const updateDoc={$set:user};
              const result=await userCollection.updateOne(filter,updateDoc,options);
              res.json(result);
-         })
+
+         });
+
+
+          ////////////////////////////////making admin and giving 
+          app.put('/users/admin', verifyToken, async (req, res) => {
+            const user = req.body;
+            const requester = req.decodedEmail;
+            if (requester) {
+                const requesterAccount = await userCollection.findOne({ email: requester });
+                if (requesterAccount.role === 'admin') {
+                    const filter = { email: user.email };
+                    const updateDoc = { $set: { role: 'admin' } };
+                    const result = await userCollection.updateOne(filter, updateDoc);
+                    res.json(result);
+                }
+            }
+            else {
+                res.status(403).json({ message: 'you do not have access to make admin' })
+            }
+
+        })
+
+
+
     }
     finally{
         //do something
